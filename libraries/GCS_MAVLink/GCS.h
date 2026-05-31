@@ -1012,6 +1012,7 @@ private:
                                                      const uint8_t reset_counter,
                                                      const uint16_t payload_size);
     void handle_vision_speed_estimate(const mavlink_message_t &msg);
+    void handle_radar_odometry(const mavlink_message_t &msg);
     void handle_landing_target(const mavlink_message_t &msg);
     void handle_generator_message(const mavlink_message_t &msg);
 

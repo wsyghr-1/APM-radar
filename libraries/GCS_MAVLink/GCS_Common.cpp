@@ -4102,6 +4102,103 @@ void GCS_MAVLINK::handle_vision_speed_estimate(const mavlink_message_t &msg)
     uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.usec, PAYLOAD_SIZE(chan, VISION_SPEED_ESTIMATE));
     visual_odom->handle_vision_speed_estimate(m.usec, timestamp_ms, vel, m.reset_counter, 0);
 }
+
+/*
+  处理 RADAR_ODOMETRY 消息
+  接收外部雷达里程计系统的位置和速度数据，通过 AP_VisualOdom 送入 EKF 融合
+ */
+void GCS_MAVLINK::handle_radar_odometry(const mavlink_message_t &msg)
+{
+    // 获取 AP_VisualOdom 单例，未启用时直接返回
+    AP_VisualOdom *visual_odom = AP::visualodom();
+    if (visual_odom == nullptr) {
+        return;
+    }
+
+    // 解码 RADAR_ODOMETRY 消息
+    mavlink_radar_odometry_t m;
+    mavlink_msg_radar_odometry_decode(&msg, &m);
+
+    // 有效性检查
+    if (m.is_valid == 0) {
+        return;
+    }
+
+    // 检查位置、速度是否有效
+    if (!isfinite(m.p_local[0]) ||
+        !isfinite(m.p_local[1]) ||
+        !isfinite(m.p_local[2]) ||
+        !isfinite(m.v_local[0]) ||
+        !isfinite(m.v_local[1]) ||
+        !isfinite(m.v_local[2])) {
+        return;
+    }
+
+    // 检查四元数是否有效
+    if (!isfinite(m.q[0]) ||
+        !isfinite(m.q[1]) ||
+        !isfinite(m.q[2]) ||
+        !isfinite(m.q[3])) {
+        return;
+    }
+
+    // 时间戳校正：外部时间戳 -> 本地 boot 后毫秒
+    const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(
+        m.time_usec,
+        MAVLINK_MSG_ID_RADAR_ODOMETRY_LEN);
+
+    // 计算位置误差：p_local_std 三轴 RSS
+    float posErr = 0.0f;
+    if (isfinite(m.p_local_std[0]) &&
+        isfinite(m.p_local_std[1]) &&
+        isfinite(m.p_local_std[2])) {
+        posErr = sqrtf(m.p_local_std[0] * m.p_local_std[0] +
+                       m.p_local_std[1] * m.p_local_std[1] +
+                       m.p_local_std[2] * m.p_local_std[2]);
+    }
+
+    // 构造姿态四元数，RADAR_ODOMETRY XML 中顺序是 w, x, y, z
+    Quaternion att{m.q[0], m.q[1], m.q[2], m.q[3]};
+    att.normalize();
+
+    // 姿态误差：你的 RADAR_ODOMETRY 没有角度标准差字段，这里先给 0
+    const float angErr = 0.0f;
+
+    // reset_counter：你的消息里没有 reset_counter 字段，先固定为 0
+    const uint8_t reset_counter = 0;
+
+    // quality：is_valid 已经判断有效，所以这里给 100
+    const int8_t quality = 100;
+
+    // 送入位置 + 姿态
+    visual_odom->handle_pose_estimate(
+        m.time_usec,
+        timestamp_ms,
+        m.p_local[0],
+        m.p_local[1],
+        m.p_local[2],
+        att,
+        posErr,
+        angErr,
+        reset_counter,
+        quality);
+
+    // 构造 NED 速度
+    const Vector3f vel_ned{
+        m.v_local[0],
+        m.v_local[1],
+        m.v_local[2]
+    };
+
+    // 送入 NED 速度
+    // 注意：你当前 AP_VisualOdom_MAV 接口不支持 velErr，所以 v_local_std 暂时不能传进去
+    visual_odom->handle_vision_speed_estimate(
+        m.time_usec,
+        timestamp_ms,
+        vel_ned,
+        reset_counter,
+        quality);
+}
 #endif  // HAL_VISUALODOM_ENABLED
 
 void GCS_MAVLINK::handle_command_ack(const mavlink_message_t &msg)
@@ -4514,6 +4611,10 @@ void GCS_MAVLINK::handle_message(const mavlink_message_t &msg)
 
     case MAVLINK_MSG_ID_VISION_SPEED_ESTIMATE:
         handle_vision_speed_estimate(msg);
+        break;
+    
+    case MAVLINK_MSG_ID_RADAR_ODOMETRY:
+        handle_radar_odometry(msg);
         break;
 #endif  // HAL_VISUALODOM_ENABLED
 
