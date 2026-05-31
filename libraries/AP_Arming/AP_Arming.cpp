@@ -45,6 +45,7 @@
 #include <AP_Camera/AP_RunCam.h>
 #include <AP_GyroFFT/AP_GyroFFT.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 #include <AP_Parachute/AP_Parachute.h>
 #include <AP_OSD/AP_OSD.h>
 #include <AP_Relay/AP_Relay.h>
@@ -2019,6 +2020,17 @@ bool AP_Arming::visodom_checks(bool display_failure) const
             return false;
         }
     }
+
+#if HAL_RADARODOM_ENABLED
+    AP_RadarOdom *radar_odom = AP::radarodom();
+    if (radar_odom != nullptr) {
+        char fail_msg[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
+        if (!radar_odom->pre_arm_check(fail_msg, ARRAY_SIZE(fail_msg))) {
+            check_failed(Check::VISION, display_failure, "RadarOdom: %s", fail_msg);
+            return false;
+        }
+    }
+#endif
 
     return true;
 }

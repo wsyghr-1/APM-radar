@@ -54,6 +54,7 @@
 #include <AP_GyroFFT/AP_GyroFFT.h>
 #include <AP_Networking/AP_Networking.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 #include <AP_VideoTX/AP_VideoTX.h>
 #include <AP_MSP/AP_MSP.h>
 #include <AP_Frsky_Telem/AP_Frsky_Parameters.h>
@@ -412,6 +413,10 @@ protected:
 
 #if HAL_VISUALODOM_ENABLED
     AP_VisualOdom visual_odom;
+#endif
+
+#if HAL_RADARODOM_ENABLED
+    AP_RadarOdom radar_odom;
 #endif
 
 #if HAL_WITH_ESC_TELEM

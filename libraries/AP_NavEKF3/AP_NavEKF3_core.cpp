@@ -4,6 +4,7 @@
 #include "AP_NavEKF3_core.h"
 #include <GCS_MAVLink/GCS.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_DAL/AP_DAL.h>
 
@@ -81,6 +82,13 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
     const auto *visual_odom = dal.visualodom();
     if ((visual_odom != nullptr) && visual_odom->enabled()) {
         maxTimeDelay_ms = MAX(maxTimeDelay_ms, MIN(visual_odom->get_delay_ms(), 250));
+    }
+#endif
+
+#if HAL_RADARODOM_ENABLED
+    const auto *radar_odom = AP::radarodom();
+    if ((radar_odom != nullptr) && radar_odom->enabled()) {
+        maxTimeDelay_ms = MAX(maxTimeDelay_ms, MIN(radar_odom->get_delay_ms(), 250));
     }
 #endif
 

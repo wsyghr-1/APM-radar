@@ -145,6 +145,12 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     AP_SUBGROUPINFO(kdecan, "KDE_",  19, AP_Vehicle, AP_KDECAN),
 #endif
 
+#if HAL_RADARODOM_ENABLED
+    // @Group: RADO
+    // @Path: ../AP_RadarOdom/AP_RadarOdom.cpp
+    AP_SUBGROUPINFO(radar_odom, "RADO", 20, AP_Vehicle, AP_RadarOdom),
+#endif
+
 #if APM_BUILD_COPTER_OR_HELI || APM_BUILD_TYPE(APM_BUILD_ArduPlane) || APM_BUILD_TYPE(APM_BUILD_Rover)
     // @Param: FLTMODE_GCSBLOCK
     // @DisplayName: Flight mode block from GCS
@@ -463,6 +469,10 @@ void AP_Vehicle::setup()
 #if HAL_VISUALODOM_ENABLED
     // init library used for visual position estimation
     visual_odom.init();
+#endif
+
+#if HAL_RADARODOM_ENABLED
+    radar_odom.init();
 #endif
 
 #if AP_VIDEOTX_ENABLED

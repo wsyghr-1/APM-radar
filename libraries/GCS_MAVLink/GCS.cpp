@@ -15,6 +15,7 @@
 #include <AP_GPS/AP_GPS.h>
 #include <AP_Arming/AP_Arming.h>
 #include <AP_VisualOdom/AP_VisualOdom.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 #include <AP_Notify/AP_Notify.h>
 #include <AP_OpticalFlow/AP_OpticalFlow.h>
 #include <RC_Channel/RC_Channel.h>
@@ -595,6 +596,17 @@ void GCS::update_sensor_status_flags()
         control_sensors_present |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
         control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
         if (visual_odom->healthy()) {
+            control_sensors_health |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
+        }
+    }
+#endif
+
+#if HAL_RADARODOM_ENABLED
+    const AP_RadarOdom *radar_odom = AP::radarodom();
+    if (radar_odom && radar_odom->enabled()) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
+        if (radar_odom->healthy()) {
             control_sensors_health |= MAV_SYS_STATUS_SENSOR_VISION_POSITION;
         }
     }

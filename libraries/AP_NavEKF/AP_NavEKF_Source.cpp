@@ -18,6 +18,7 @@
 #include <AP_DAL/AP_DAL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 #include "AP_Nav_Common.h"
 
 extern const AP_HAL::HAL& hal;
@@ -535,13 +536,17 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
     }
 
     if (visualodom_required) {
-        bool visualodom_available = false;
+        bool extnav_available = false;
 #if HAL_VISUALODOM_ENABLED
         auto *vo = AP::dal().visualodom();
-        visualodom_available = vo && vo->enabled();
+        extnav_available = vo && vo->enabled();
 #endif
-        if (!visualodom_available) {
-            hal.util->snprintf(failure_msg, failure_msg_len, ekf_requires_msg, "VisualOdom");
+#if HAL_RADARODOM_ENABLED
+        auto *ro = AP::radarodom();
+        extnav_available = extnav_available || (ro && ro->enabled());
+#endif
+        if (!extnav_available) {
+            hal.util->snprintf(failure_msg, failure_msg_len, ekf_requires_msg, "ExtNav");
             return false;
         }
     }

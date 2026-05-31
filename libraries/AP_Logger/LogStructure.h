@@ -137,6 +137,7 @@ const struct MultiplierStructure log_Multipliers[] = {
 #include <AP_Baro/LogStructure.h>
 #include <AP_CANManager/LogStructure.h>
 #include <AP_VisualOdom/LogStructure.h>
+#include <AP_RadarOdom/LogStructure.h>
 #include <AC_PrecLand/LogStructure.h>
 #include <AP_Proximity/LogStructure.h>
 #include <AC_Avoidance/LogStructure.h>
@@ -1235,6 +1236,7 @@ LOG_STRUCTURE_FROM_FENCE \
     { LOG_MAV_MSG, sizeof(log_MAV),   \
       "MAV", "QBHHHBHHI",   "TimeUS,chan,txp,rxp,rxdp,flags,ss,tf,mgs", "s#----s-s", "F-000-C-C" },   \
 LOG_STRUCTURE_FROM_VISUALODOM \
+LOG_STRUCTURE_FROM_RADARODOM \
     { LOG_OPTFLOW_MSG, sizeof(log_Optflow), \
       "OF",   "QBffff",   "TimeUS,Qual,flowX,flowY,bodyX,bodyY", "s-EEEE", "F-0000" , true }, \
     { LOG_WHEELENCODER_MSG, sizeof(log_WheelEncoder), \
@@ -1321,6 +1323,7 @@ enum LogMessages : uint8_t {
     LOG_IDS_FROM_INERTIALSENSOR,
 
     LOG_IDS_FROM_VISUALODOM,
+    LOG_IDS_FROM_RADARODOM,
     LOG_IDS_FROM_AVOIDANCE,
     LOG_IDS_FROM_BEACON,
     LOG_IDS_FROM_PROXIMITY,
