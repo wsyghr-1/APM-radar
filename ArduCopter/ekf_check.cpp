@@ -32,9 +32,19 @@ void Copter::ekf_check()
     // ensure EKF_CHECK_ITERATIONS_MAX is at least 7
     static_assert(EKF_CHECK_ITERATIONS_MAX >= 7, "EKF_CHECK_ITERATIONS_MAX must be at least 7");
 
-    // exit immediately if ekf has no origin yet - this assumes the origin can never become unset
+    // Both absolute and relative EKF position can support position modes.
+    // Relative position does not require a global EKF origin.
+    const bool has_position = ekf_has_relative_position() || ekf_has_absolute_position();
+
+    // Before any valid position estimate has ever been established, preserve
+    // the original behaviour and do not trigger an EKF failsafe solely because
+    // the global origin is unavailable.
+    // Once relative or absolute position has passed the EKF check, continue
+    // monitoring position validity even when no global origin exists.
     Location temp_loc;
-    if (!ahrs.get_origin(temp_loc)) {
+    const bool origin_available = ahrs.get_origin(temp_loc);
+
+    if (!origin_available && !has_position && !ekf_check_state.has_ever_passed) {
         return;
     }
 
@@ -50,8 +60,8 @@ void Copter::ekf_check()
     // compare compass and velocity variance vs threshold and also check
     // if we has a position estimate
     const bool over_threshold = ekf_over_threshold();
-    const bool has_position = ekf_has_relative_position() || ekf_has_absolute_position();
-    const bool checks_passed = !over_threshold && has_position;
+    const bool position_required = flightmode->requires_GPS();
+    const bool checks_passed = !over_threshold && (!position_required || has_position);
 
     // return if ekf checks have never passed
     ekf_check_state.has_ever_passed |= checks_passed;

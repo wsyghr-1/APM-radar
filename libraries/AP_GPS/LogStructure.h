@@ -27,9 +27,10 @@
 // @Field: Lat: latitude
 // @Field: Lng: longitude
 // @Field: Alt: altitude
-// @Field: Spd: ground speed
 // @Field: GCrs: ground course
-// @Field: VZ: vertical speed
+// @Field: VX: North velocity
+// @Field: VY: East velocity
+// @Field: VZ: Down velocity
 // @Field: Yaw: vehicle yaw
 // @Field: U: boolean value indicating whether this GPS is in use
 struct PACKED log_GPS {
@@ -44,8 +45,9 @@ struct PACKED log_GPS {
     int32_t  latitude;
     int32_t  longitude;
     int32_t  altitude;
-    float    ground_speed;
     float    ground_course;
+    float    vel_x;
+    float    vel_y;
     float    vel_z;
     float    yaw;
     uint8_t  used;
@@ -205,7 +207,7 @@ struct PACKED log_GPS_RAWS {
 
 #define LOG_STRUCTURE_FROM_GPS \
     { LOG_GPS_MSG, sizeof(log_GPS), \
-      "GPS",  "QBBIHBcLLeffffB", "TimeUS,I,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U", "s#-s-S-DUmnhnh-", "F--C-0BGGB000--" , true }, \
+      "GPS",  "QBBIHBcLLefffffB", "TimeUS,I,Stat,GMS,GWk,NSats,HDop,Lat,Lng,Alt,GCrs,VX,VY,VZ,Yaw,U", "s#-s-S-DUmhnnnh-", "F--C-0BGGB0000--", true }, \
     { LOG_GPA_MSG,  sizeof(log_GPA), \
       "GPA",  "QBCCCCfBIHeHH", "TimeUS,I,VDop,HAcc,VAcc,SAcc,YAcc,VV,SMS,Delta,AEl,RTCMFU,RTCMFD", "s#-mmnd-ssm--", "F-BBBB0-CCB--" , true }, \
     { LOG_GPS_UBX1_MSG, sizeof(log_Ubx1), \

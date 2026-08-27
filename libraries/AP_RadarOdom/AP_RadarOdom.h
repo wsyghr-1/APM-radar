@@ -47,6 +47,11 @@ public:
 
     static const struct AP_Param::GroupInfo var_info[];
 
+    // MAVLink settings
+    static constexpr int32_t MAVLINK_SYSTEM_TIME_INTERVAL_US = 1000000;
+    static constexpr int32_t MAVLINK_ATTITUDE_QUATERNION_INTERVAL_US = 20000;
+    static constexpr int32_t MAVLINK_HIGHRES_IMU_INTERVAL_US = 8333;
+
 private:
     static AP_RadarOdom *_singleton;
 
@@ -64,7 +69,7 @@ private:
 
 #if HAL_LOGGING_ENABLED
     void Write_RadarOdom(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &pos, const Vector3f &vel,
-                         const Quaternion &attitude, float posErr, float velErr, uint8_t ignored, bool valid) const;
+                         const Quaternion &attitude, float posErr, float velErr, bool valid) const;
 #endif
 };
 

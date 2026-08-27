@@ -1897,6 +1897,7 @@ void AP_GPS::Write_GPS(uint8_t i)
 {
     const uint64_t time_us = AP_HAL::micros64();
     const Location &loc = location(i);
+    const Vector3f &vel = velocity(i);
 
     float yaw_deg=0, yaw_accuracy_deg=0;
     uint32_t yaw_time_ms;
@@ -1914,9 +1915,10 @@ void AP_GPS::Write_GPS(uint8_t i)
         latitude      : loc.lat,
         longitude     : loc.lng,
         altitude      : loc.alt,
-        ground_speed  : ground_speed(i),
         ground_course : ground_course(i),
-        vel_z         : velocity(i).z,
+        vel_x         : vel.x,
+        vel_y         : vel.y,
+        vel_z         : vel.z,
         yaw           : yaw_deg,
         used          : (uint8_t)(AP::gps().primary_sensor() == i)
     };

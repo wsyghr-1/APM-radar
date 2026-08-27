@@ -145,12 +145,6 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     AP_SUBGROUPINFO(kdecan, "KDE_",  19, AP_Vehicle, AP_KDECAN),
 #endif
 
-#if HAL_RADARODOM_ENABLED
-    // @Group: RADO
-    // @Path: ../AP_RadarOdom/AP_RadarOdom.cpp
-    AP_SUBGROUPINFO(radar_odom, "RADO", 20, AP_Vehicle, AP_RadarOdom),
-#endif
-
 #if APM_BUILD_COPTER_OR_HELI || APM_BUILD_TYPE(APM_BUILD_ArduPlane) || APM_BUILD_TYPE(APM_BUILD_Rover)
     // @Param: FLTMODE_GCSBLOCK
     // @DisplayName: Flight mode block from GCS
@@ -293,6 +287,12 @@ const AP_Param::GroupInfo AP_Vehicle::var_info[] = {
     // @Group: RPM
     // @Path: ../AP_RPM/AP_RPM.cpp
     AP_SUBGROUPINFO(rpm_sensor, "RPM", 32, AP_Vehicle, AP_RPM),
+#endif
+
+#if HAL_RADARODOM_ENABLED
+    // @Group: RADO
+    // @Path: ../AP_RadarOdom/AP_RadarOdom.cpp
+    AP_SUBGROUPINFO(radar_odom, "RADO", 33, AP_Vehicle, AP_RadarOdom),
 #endif
 
     AP_GROUPEND
@@ -1073,6 +1073,18 @@ void AP_Vehicle::update_arming()
 void AP_Vehicle::one_Hz_update(void)
 {
     one_Hz_counter++;
+
+#if HAL_RADARODOM_ENABLED
+    if (radar_odom.enabled()) {
+        float radar_state = 0.0f;
+
+        if (radar_odom.healthy()) {
+            radar_state = radar_odom.quality() >= 0 ? 2.0f : 1.0f;
+        }
+
+        gcs().send_named_float("RAD_STATE", radar_state);
+    }
+#endif
 
     /*
       every 10s check if using a 2M firmware on a 1M board

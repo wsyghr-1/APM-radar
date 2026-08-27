@@ -1418,25 +1418,38 @@ float AC_PosControl::get_bearing_to_target_rad() const
 // When high_vibes is true, forces use of vertical fallback for velocity.
 void AC_PosControl::update_estimates(bool high_vibes)
 {
-    Vector3p pos_estimate_ned_m;
-    if (!AP::ahrs().get_relative_position_NED_origin(pos_estimate_ned_m)) {
-        float posD;
-        if (AP::ahrs().get_relative_position_D_origin_float(posD)) {
-            pos_estimate_ned_m.z = posD;
+    // Update horizontal position only when valid
+    Vector2p pos_estimate_ne_m;
+    if (AP::ahrs().get_relative_position_NE_origin(pos_estimate_ne_m)) {
+        _pos_estimate_neu_m.xy() = pos_estimate_ne_m;
+    }
+
+    // Update vertical position independently and only when valid
+    float posD;
+    if (AP::ahrs().get_relative_position_D_origin_float(posD)) {
+        _pos_estimate_neu_m.z = -posD;
+    }
+
+    // Update horizontal velocity only when complete NED velocity is valid
+    Vector3f vel_estimate_ned_ms;
+    const bool vel_ned_valid = AP::ahrs().get_velocity_NED(vel_estimate_ned_ms);
+
+    if (vel_ned_valid) {
+        _vel_estimate_neu_ms.xy() = vel_estimate_ned_ms.xy();
+
+        if (!high_vibes) {
+            _vel_estimate_neu_ms.z = -vel_estimate_ned_ms.z;
         }
     }
-    _pos_estimate_neu_m.xy() = pos_estimate_ned_m.xy();
-    _pos_estimate_neu_m.z = -pos_estimate_ned_m.z;
 
-    Vector3f vel_estimate_ned_ms;
-    if (!AP::ahrs().get_velocity_NED(vel_estimate_ned_ms) || high_vibes) {
+    // During high vibration, or if complete NED velocity is unavailable,
+    // update vertical velocity from the independent fallback
+    if (!vel_ned_valid || high_vibes) {
         float rate_z;
         if (AP::ahrs().get_vert_pos_rate_D(rate_z)) {
-            vel_estimate_ned_ms.z = rate_z;
+            _vel_estimate_neu_ms.z = -rate_z;
         }
     }
-    _vel_estimate_neu_ms.xy() = vel_estimate_ned_ms.xy();
-    _vel_estimate_neu_ms.z = -vel_estimate_ned_ms.z;
 }
 
 // Calculates vertical throttle using vibration-resistant feedforward estimation.
@@ -1675,6 +1688,16 @@ void AC_PosControl::handle_ekf_NE_reset()
     Vector2f pos_shift;
     uint32_t reset_ms = _ahrs.getLastPosNorthEastReset(pos_shift);
     if (reset_ms != _ekf_ne_reset_ms) {
+        Vector2p pos_ne_m;
+
+        // Position is temporarily unavailable.
+        // Do not consume this reset event; retry next cycle.
+        if (!AP::ahrs().get_relative_position_NE_origin(pos_ne_m)) {
+            return;
+        }
+
+        _pos_estimate_neu_m.xy() = pos_ne_m;
+
         // Reset NE controller to preserve relative position control during Loiter, PosHold, etc.
         // This ensures controller output remains continuous after EKF realigns the origin.
 
@@ -1707,6 +1730,16 @@ void AC_PosControl::handle_ekf_U_reset()
     float alt_shift_d_m;
     uint32_t reset_ms = _ahrs.getLastPosDownReset(alt_shift_d_m);
     if (reset_ms != 0 && reset_ms != _ekf_u_reset_ms) {
+        float posD;
+
+        // Vertical position is temporarily unavailable.
+        // Leave the reset pending and retry next cycle.
+        if (!AP::ahrs().get_relative_position_D_origin_float(posD)) {
+            return;
+        }
+
+        _pos_estimate_neu_m.z = -posD;
+
         // Reset U controller to preserve continuity during relative-altitude modes (e.g., Loiter, PosHold).
         // Compensates for EKF origin shift without abrupt position or velocity discontinuities.
 

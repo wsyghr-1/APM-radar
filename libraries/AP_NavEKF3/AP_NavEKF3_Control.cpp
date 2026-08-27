@@ -293,7 +293,8 @@ void NavEKF3_core::setAidingMode()
 #if EK3_FEATURE_OPTFLOW_FUSION
                 readyToUseOptFlow() ||
 #endif
-                readyToUseBodyOdm()) {
+                readyToUseBodyOdm() ||
+                readyToUseExtNavVel()) {
                 PV_AidingMode = AID_RELATIVE;
             }
             break;
@@ -303,11 +304,18 @@ void NavEKF3_core::setAidingMode()
             bool flowFusionTimeout = ((imuSampleTime_ms - prevFlowFuseTime_ms) > 5000);
             // Check if the fusion has timed out (body odometry measurements have been rejected for too long)
             bool bodyOdmFusionTimeout = ((imuSampleTime_ms - prevBodyVelFuseTime_ms) > 5000);
+            // Check if the External Velocity has timed out
+#if EK3_FEATURE_EXTERNAL_NAV
+            const bool extNavVelConfigured = frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index);
+            const bool extNavVelFusionTimeout = !extNavVelConfigured || (lastExtNavVelPassTime_ms == 0) || ((imuSampleTime_ms - lastExtNavVelPassTime_ms) > 5000);
+#else
+            const bool extNavVelFusionTimeout = true;
+#endif
             // Enable switch to absolute position mode if GPS or range beacon data is available
             // If GPS or range beacons data is not available and flow fusion has timed out, then fall-back to no-aiding
             if (readyToUseGPS() || readyToUseRangeBeacon() || readyToUseExtNav()) {
                 PV_AidingMode = AID_ABSOLUTE;
-            } else if (flowFusionTimeout && bodyOdmFusionTimeout) {
+            } else if (flowFusionTimeout && bodyOdmFusionTimeout && extNavVelFusionTimeout) {
                 PV_AidingMode = AID_NONE;
             }
             break;
@@ -433,9 +441,12 @@ void NavEKF3_core::setAidingMode()
             bodyVelFusionActive = false;
             break;
 
-        case AID_RELATIVE:
+        case AID_RELATIVE: {
             // We are doing relative position navigation where velocity errors are constrained, but position drift will occur
             GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u started relative aiding",(unsigned)imu_index);
+
+            bool extnav_velocity_ready = false;
+
 #if EK3_FEATURE_OPTFLOW_FUSION
             if (readyToUseOptFlow()) {
                 // Reset time stamps
@@ -443,14 +454,35 @@ void NavEKF3_core::setAidingMode()
                 prevFlowFuseTime_ms = imuSampleTime_ms;
             } else
 #endif
-                if (readyToUseBodyOdm()) {
-                 // Reset time stamps
+            if (readyToUseBodyOdm()) {
+                // Reset time stamps
                 lastbodyVelPassTime_ms = imuSampleTime_ms;
                 prevBodyVelFuseTime_ms = imuSampleTime_ms;
+#if EK3_FEATURE_EXTERNAL_NAV
+            } else if (readyToUseExtNavVel()) {
+                // ExternalNav velocity is expressed in the navigation frame.
+                // Use it as the initial velocity source.
+                velResetSource = resetDataSource::EXTNAV;
+
+                // Give the first ExternalNav velocity fusion a short startup
+                // grace period. Successful fusion will continue updating this.
+                lastExtNavVelPassTime_ms = imuSampleTime_ms;
+
+                extnav_velocity_ready = true;
+
+                GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u started ExtNav velocity aiding", (unsigned)imu_index);
+#endif
             }
+
+            // No external horizontal position observation is being fused.
+            // Position is propagated by integrating the velocity estimate.
             posTimeout = true;
-            velTimeout = true;
+
+            // ExternalNav velocity is already available and will be fused in
+            // this cycle. Other relative-aiding sources retain the old logic.
+            velTimeout = !extnav_velocity_ready;
             break;
+        }
 
         case AID_ABSOLUTE:
             if (readyToUseGPS()) {
@@ -619,6 +651,26 @@ bool NavEKF3_core::readyToUseExtNav(void) const
 #endif // EK3_FEATURE_EXTERNAL_NAV
 }
 
+// return true if the filter is ready to use external nav velocity
+bool NavEKF3_core::readyToUseExtNavVel(void) const
+{
+#if EK3_FEATURE_EXTERNAL_NAV
+    if (!frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index)) {
+        return false;
+    }
+
+    if (!extNavVelToFuse) {
+        return false;
+    }
+
+    return tiltAlignComplete
+        && yawAlignComplete
+        && delAngBiasLearned;
+#else
+    return false;
+#endif
+}
+
 // return true if we should use the compass
 bool NavEKF3_core::use_compass(void) const
 {
@@ -762,11 +814,26 @@ void  NavEKF3_core::updateFilterStatus(void)
     nav_filter_status status;
     status.value = 0;
     bool doingBodyVelNav = (PV_AidingMode != AID_NONE) && (imuSampleTime_ms - prevBodyVelFuseTime_ms < 5000);
+#if EK3_FEATURE_EXTERNAL_NAV
+    // ExternalNav velocity has recently passed the EKF innovation test
+    const bool extNavVelRecentlyFused = (lastExtNavVelPassTime_ms != 0) && ((imuSampleTime_ms - lastExtNavVelPassTime_ms) < 1000);
+
+    // ExternalNav horizontal velocity is the active velocity source
+    const bool doingExtNavVelXYNav = (PV_AidingMode != AID_NONE) && frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index)
+                                    && useExtNavVel && extNavVelRecentlyFused;
+
+    // ExternalNav vertical velocity is the active velocity source
+    const bool doingExtNavVelZNav = (PV_AidingMode != AID_NONE) && frontend->sources.useVelZSource( AP_NavEKF_Source::SourceZ::EXTNAV, core_index)
+                                    && useExtNavVel && extNavVelRecentlyFused;
+#else
+    const bool doingExtNavVelXYNav = false;
+    const bool doingExtNavVelZNav = false;
+#endif
     bool doingFlowNav = (PV_AidingMode != AID_NONE) && flowDataValid;
     bool doingWindRelNav = (!tasTimeout && assume_zero_sideslip()) || !dragTimeout;
     bool doingNormalGpsNav = !posTimeout && (PV_AidingMode == AID_ABSOLUTE);
     bool someVertRefData = (!velTimeout && (useGpsVertVel || useExtNavVel)) || !hgtTimeout;
-    bool someHorizRefData = !(velTimeout && posTimeout && tasTimeout && dragTimeout) || doingFlowNav || doingBodyVelNav;
+    bool someHorizRefData = !(velTimeout && posTimeout && tasTimeout && dragTimeout) || doingFlowNav || doingBodyVelNav || doingExtNavVelXYNav;
     bool filterHealthy = healthy() && tiltAlignComplete && (yawAlignComplete || (!use_compass() && (PV_AidingMode != AID_ABSOLUTE)));
 
     // If GPS height usage is specified, height is considered to be inaccurate until the GPS passes all checks
@@ -782,10 +849,17 @@ void  NavEKF3_core::updateFilterStatus(void)
 #else
     const bool optflow_gnd_offset = gndOffsetValid;
 #endif
-    status.flags.horiz_pos_rel = ((doingFlowNav && optflow_gnd_offset) || doingWindRelNav || doingNormalGpsNav || doingBodyVelNav) && filterHealthy;   // relative horizontal position estimate valid
+    status.flags.horiz_pos_rel = ((doingFlowNav && optflow_gnd_offset) || doingWindRelNav || doingNormalGpsNav || doingBodyVelNav || doingExtNavVelXYNav) && filterHealthy;   // relative horizontal position estimate valid
 
     status.flags.horiz_pos_abs = doingNormalGpsNav && filterHealthy; // absolute horizontal position estimate valid
-    status.flags.vert_pos = !hgtTimeout && filterHealthy && !hgtNotAccurate; // vertical position estimate valid
+
+    // Vertical position is directly constrained by a height observation
+    const bool measuredVertPosValid = !hgtTimeout && !hgtNotAccurate;
+    // Vertical position is propagated by integrating a healthy
+    // ExternalNav vertical velocity observation
+    const bool integratedVertPosValid = doingExtNavVelZNav;
+    status.flags.vert_pos = (measuredVertPosValid || integratedVertPosValid) && filterHealthy; // vertical position estimate valid
+
     status.flags.terrain_alt = gndOffsetValid && filterHealthy;		// terrain height estimate valid
     status.flags.const_pos_mode = (PV_AidingMode == AID_NONE) && filterHealthy;     // constant position mode
     status.flags.pred_horiz_pos_rel = status.flags.horiz_pos_rel; // EKF3 enters the required mode before flight

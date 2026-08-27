@@ -7,7 +7,7 @@
 #include <AP_Logger/AP_Logger.h>
 
 void AP_RadarOdom::Write_RadarOdom(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &pos, const Vector3f &vel,
-                                   const Quaternion &attitude, float posErr, float velErr, uint8_t ignored, bool valid) const
+                                   const Quaternion &attitude, float posErr, float velErr, bool valid) const
 {
     const struct log_RadarOdom pkt {
         LOG_PACKET_HEADER_INIT(LOG_RADARODOM_MSG),
@@ -26,9 +26,7 @@ void AP_RadarOdom::Write_RadarOdom(uint64_t remote_time_us, uint32_t time_ms, co
         q4              : attitude.q4,
         pos_err         : posErr,
         vel_err         : velErr,
-        ignored         : ignored,
-        valid           : uint8_t(valid),
-        quality         : _quality
+        valid           : uint8_t(valid)
     };
     AP::logger().WriteBlock(&pkt, sizeof(log_RadarOdom));
 }

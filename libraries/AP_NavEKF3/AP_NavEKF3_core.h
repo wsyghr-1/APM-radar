@@ -896,6 +896,9 @@ private:
     // return true if the filter to be ready to use external nav data
     bool readyToUseExtNav(void) const;
 
+    // return true if the filter to be ready to use external nav velocity
+    bool readyToUseExtNavVel(void) const;
+
     // return true if we should use the range finder sensor
     bool useRngFinder(void) const;
 
@@ -1132,6 +1135,9 @@ private:
     uint32_t lastBaroReceived_ms;   // time last time we received baro height data
     uint16_t hgtRetryTime_ms;       // time allowed without use of height measurements before a height timeout is declared
     uint32_t lastVelPassTime_ms;    // time stamp when GPS velocity measurement last passed innovation consistency check (msec)
+#if EK3_FEATURE_EXTERNAL_NAV
+    uint32_t lastExtNavVelPassTime_ms;      // time of the most recent successful ExternalNav velocity innovation test
+#endif
     uint32_t lastGpsPosPassTime_ms;    // time stamp when GPS position measurement last passed innovation consistency check (msec)
     uint32_t lastHgtPassTime_ms;    // time stamp when height measurement last passed innovation consistency check (msec)
     uint32_t lastTasPassTime_ms;    // time stamp when airspeed measurement last passed innovation consistency check (msec)

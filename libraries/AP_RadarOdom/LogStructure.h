@@ -23,9 +23,7 @@
 // @Field: Q4: Attitude quaternion Z-axis
 // @Field: PErr: Position estimate error
 // @Field: VErr: Velocity estimate error
-// @Field: Ign: Ignored bitmask
 // @Field: V: Valid flag
-// @Field: Q: Quality
 struct PACKED log_RadarOdom {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -43,15 +41,13 @@ struct PACKED log_RadarOdom {
     float q4;
     float pos_err;
     float vel_err;
-    uint8_t ignored;
     uint8_t valid;
-    int8_t quality;
 };
 
 #if HAL_RADARODOM_ENABLED
 #define LOG_STRUCTURE_FROM_RADARODOM \
     { LOG_RADARODOM_MSG, sizeof(log_RadarOdom), \
-      "RADO", "QQIffffffffffffBBb", "TimeUS,RTimeUS,CTimeMS,PX,PY,PZ,VX,VY,VZ,Q1,Q2,Q3,Q4,PErr,VErr,Ign,V,Q", "sssmmmnnn----mn--%", "FFC000000000000--0" },
+      "RADO", "QQIffffffffffffB", "TimeUS,RTimeUS,CTimeMS,PX,PY,PZ,VX,VY,VZ,Q1,Q2,Q3,Q4,PErr,VErr,V", "sssmmmnnn----mn-", "FFC000000000000-" },
 #else
 #define LOG_STRUCTURE_FROM_RADARODOM
 #endif

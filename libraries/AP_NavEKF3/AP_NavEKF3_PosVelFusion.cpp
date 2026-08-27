@@ -899,6 +899,12 @@ void NavEKF3_core::FuseVelPosNED()
             if (velTestRatio < 1.0) {
                 velCheckPassed = true;
                 lastVelPassTime_ms = imuSampleTime_ms;
+#if EK3_FEATURE_EXTERNAL_NAV
+                if (extNavVelToFuse && (frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index)
+                    || frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::EXTNAV, core_index))) {
+                    lastExtNavVelPassTime_ms = imuSampleTime_ms;
+                }
+#endif
             } else if (frontend->_gpsGlitchRadiusMax <= 0) {
                 // Handle the special case where the glitch radius parameter has been set to a non-positive number.
                 // The innovation variance is increased to limit the state update to an amount corresponding
@@ -909,6 +915,12 @@ void NavEKF3_core::FuseVelPosNED()
                 }
                 velCheckPassed = true;
                 lastVelPassTime_ms = imuSampleTime_ms;
+#if EK3_FEATURE_EXTERNAL_NAV
+                if (extNavVelToFuse && (frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index)
+                    || frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::EXTNAV, core_index))) {
+                    lastExtNavVelPassTime_ms = imuSampleTime_ms;
+                }
+#endif
             }
 
             // Use velocity data if healthy, timed out or when IMU fault has been detected
@@ -1318,6 +1330,15 @@ void NavEKF3_core::selectHeightForFusion()
             correctEkfOriginHeight();
     }
 
+    // Do not fuse the synthetic zero-height observation while flying with
+    // ExternalNav selected as the vertical velocity source. Vertical position
+    // is propagated by integrating the external velocity.
+#if EK3_FEATURE_EXTERNAL_NAV
+    const bool inhibitSyntheticHeight = !onGround && frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::EXTNAV, core_index);
+#else
+    const bool inhibitSyntheticHeight = false;
+#endif
+
     // Select the height measurement source
 #if EK3_FEATURE_EXTERNAL_NAV
     if (extNavDataToFuse && (activeHgtSource == AP_NavEKF_Source::SourceZ::EXTNAV)) {
@@ -1379,8 +1400,11 @@ void NavEKF3_core::selectHeightForFusion()
             posDownObsNoise *= frontend->gndEffectBaroScaler;
         }
         velPosObs[5] = -hgtMea;
-    } else if ((activeHgtSource == AP_NavEKF_Source::SourceZ::NONE && imuSampleTime_ms - lastHgtPassTime_ms > 70)) {
-        // fuse a constant height of 0 at 14 Hz
+    } else if ((activeHgtSource == AP_NavEKF_Source::SourceZ::NONE && !inhibitSyntheticHeight
+                && imuSampleTime_ms - lastHgtPassTime_ms > 70)) {
+        // Fuse a synthetic zero-height observation when no height source is
+        // available, except while flying with ExternalNav vertical-velocity
+        // relative aiding.
         hgtMea = 0.0f;
         fuseHgtData = true;
         velPosObs[5] = -hgtMea;

@@ -399,6 +399,7 @@ void NavEKF3_core::InitialiseVariables()
     extNavVelToFuse = false;
     useExtNavVel = false;
     extNavVelMeasTime_ms = 0;
+    lastExtNavVelPassTime_ms = 0;
 #endif
 
     // zero data buffers

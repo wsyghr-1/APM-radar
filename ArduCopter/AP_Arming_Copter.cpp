@@ -365,8 +365,14 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
     fence_requires_gps = (copter.fence.get_enabled_fences() & (AC_FENCE_TYPE_CIRCLE | AC_FENCE_TYPE_POLYGON)) > 0;
 #endif
 
+    const bool relative_position_available = copter.ekf_has_relative_position();
+    const bool absolute_position_available = copter.ekf_has_absolute_position();
+
+    const bool local_position_only = relative_position_available && !absolute_position_available;
+
+    const bool mode_requires_global_position = copter.flightmode->requires_GPS() && !local_position_only;
     // check if flight mode requires GPS
-    bool mode_requires_gps = copter.flightmode->requires_GPS() || fence_requires_gps || (copter.simple_mode == Copter::SimpleMode::SUPERSIMPLE);
+    bool mode_requires_gps = mode_requires_global_position || fence_requires_gps || (copter.simple_mode == Copter::SimpleMode::SUPERSIMPLE);
 
     // call parent gps checks
     if (mode_requires_gps) {

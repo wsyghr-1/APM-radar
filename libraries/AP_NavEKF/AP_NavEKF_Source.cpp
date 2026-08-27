@@ -365,7 +365,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
     bool baro_required = false;
     bool beacon_required = false;
     bool compass_required = false;
-    bool gps_required = false;
+    // bool gps_required = false;
     bool rangefinder_required = false;
     bool visualodom_required = false;
     bool optflow_required = false;
@@ -380,7 +380,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
             case SourceXY::NONE:
                 break;
             case SourceXY::GPS:
-                gps_required = true;
+                // gps_required = true;
                 break;
             case SourceXY::BEACON:
                 beacon_required = true;
@@ -401,7 +401,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
             case SourceXY::NONE:
                 break;
             case SourceXY::GPS:
-                gps_required = true;
+                // gps_required = true;
                 break;
             case SourceXY::OPTFLOW:
                 optflow_required = true;
@@ -428,7 +428,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
                 rangefinder_required = true;
                 break;
             case SourceZ::GPS:
-                gps_required = true;
+                // gps_required = true;
                 break;
             case SourceZ::BEACON:
                 beacon_required = true;
@@ -449,7 +449,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
             case SourceZ::NONE:
                 break;
             case SourceZ::GPS:
-                gps_required = true;
+                // gps_required = true;
                 break;
             case SourceZ::EXTNAV:
                 visualodom_required = true;
@@ -480,7 +480,7 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
             visualodom_required = true;
             break;
         case SourceYaw::GSF:
-            gps_required = true;
+            // gps_required = true;
             break;
         default:
             // invalid yaw value
@@ -513,7 +513,9 @@ bool AP_NavEKF_Source::pre_arm_check(bool requires_position, char *failure_msg, 
         return false;
     }
 
-    if (gps_required && (dal.gps().num_sensors() == 0)) {
+    const bool active_source_requires_gps = usingGPS(0);
+
+    if (active_source_requires_gps && (dal.gps().num_sensors() == 0)) {
         hal.util->snprintf(failure_msg, failure_msg_len, ekf_requires_msg, "GPS");
         return false;
     }

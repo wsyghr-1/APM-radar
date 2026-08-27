@@ -142,7 +142,6 @@ void AP_RadarOdom::handle_odometry(uint64_t remote_time_us, uint32_t time_ms, co
     velErr = constrain_float(velErr, _vel_noise, 100.0f);
 
     const uint8_t fuse = uint8_t(_fuse.get());
-    uint8_t ignored = 0;
     const bool quality_ok = (_quality >= _quality_min);
 
     Vector3f pos_corrected = pos;
@@ -153,20 +152,16 @@ void AP_RadarOdom::handle_odometry(uint64_t remote_time_us, uint32_t time_ms, co
 
     if (valid && quality_ok && ((fuse & FUSE_POSITION) != 0)) {
         AP::ahrs().writeExtNavData(pos_corrected, attitude, posErr, _yaw_noise, time_ms, get_delay_ms(), 0);
-    } else {
-        ignored |= FUSE_POSITION;
     }
 
     if (valid && quality_ok && ((fuse & FUSE_VELOCITY) != 0)) {
         AP::ahrs().writeExtNavVelData(vel, velErr, time_ms, get_delay_ms());
-    } else {
-        ignored |= FUSE_VELOCITY;
     }
 
     _last_update_ms = AP_HAL::millis();
 
 #if HAL_LOGGING_ENABLED
-    Write_RadarOdom(remote_time_us, time_ms, pos, vel, attitude, posErr, velErr, ignored, valid);
+    Write_RadarOdom(remote_time_us, time_ms, pos, vel, attitude, posErr, velErr, valid);
 #endif
 }
 

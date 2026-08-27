@@ -2306,7 +2306,7 @@ void GCS_MAVLINK::send_highres_imu()
 #if AP_COMPASS_ENABLED
     const Compass &compass = AP::compass();
     if (compass.get_count() >= 1) {
-        const Vector3f field = compass.get_field() * 1000.0f;
+        const Vector3f field = compass.get_field() * 0.001f;
         reply.xmag = field.x; // convert to gauss
         reply.ymag = field.y;
         reply.zmag = field.z;
@@ -4142,6 +4142,8 @@ void GCS_MAVLINK::handle_radar_odometry(const mavlink_message_t &msg)
     }
     att.normalize();
 
+    configure_radar_stream_intervals();
+
     const uint32_t timestamp_ms = correct_offboard_timestamp_usec_to_ms(m.time_usec, PAYLOAD_SIZE(chan, RADAR_ODOMETRY));
 
     float posErr = 0.0f;
@@ -4161,6 +4163,36 @@ void GCS_MAVLINK::handle_radar_odometry(const mavlink_message_t &msg)
     const Vector3f pos{m.p_local[0], m.p_local[1], m.p_local[2]};
     const Vector3f vel{m.v_local[0], m.v_local[1], m.v_local[2]};
     radar_odom->handle_odometry(m.time_usec, timestamp_ms, pos, vel, att, posErr, velErr, m.is_valid != 0);
+}
+
+/*
+  handle configure_radar_stream_intervals
+*/
+bool GCS_MAVLINK::configure_radar_stream_intervals()
+{
+    if (radar_stream_intervals_configured) {
+        return true;
+    }
+
+    if (!deferred_messages_initialised) {
+        return false;
+    }
+
+    const MAV_RESULT system_time_result = set_message_interval(MAVLINK_MSG_ID_SYSTEM_TIME, AP_RadarOdom::MAVLINK_SYSTEM_TIME_INTERVAL_US);
+
+    const MAV_RESULT attitude_result = set_message_interval(MAVLINK_MSG_ID_ATTITUDE_QUATERNION, AP_RadarOdom::MAVLINK_ATTITUDE_QUATERNION_INTERVAL_US);
+
+#if AP_MAVLINK_MSG_HIGHRES_IMU_ENABLED
+    const MAV_RESULT imu_result = set_message_interval(MAVLINK_MSG_ID_HIGHRES_IMU, AP_RadarOdom::MAVLINK_HIGHRES_IMU_INTERVAL_US);
+#else
+    const MAV_RESULT imu_result = MAV_RESULT_UNSUPPORTED;
+#endif
+
+    radar_stream_intervals_configured = system_time_result == MAV_RESULT_ACCEPTED
+                                    && attitude_result == MAV_RESULT_ACCEPTED
+                                    && imu_result == MAV_RESULT_ACCEPTED;
+
+    return radar_stream_intervals_configured;
 }
 #endif  // HAL_RADARODOM_ENABLED && defined(MAVLINK_MSG_ID_RADAR_ODOMETRY)
 

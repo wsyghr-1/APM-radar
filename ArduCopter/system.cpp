@@ -1,5 +1,6 @@
 #include "Copter.h"
 #include <AP_ESC_Telem/AP_ESC_Telem.h>
+#include <AP_RadarOdom/AP_RadarOdom.h>
 
 /*****************************************************************************
 *   The init_ardupilot function processes everything we need for an in - air restart
@@ -278,6 +279,11 @@ bool Copter::ekf_has_relative_position() const
     if (dead_reckoning.active && !dead_reckoning.timeout) {
         enabled = true;
     }
+#if HAL_RADARODOM_ENABLED
+    if (radar_odom.enabled()) {
+        enabled = true;
+    }
+#endif
     if (!enabled) {
         return false;
     }
