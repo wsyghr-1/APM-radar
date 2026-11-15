@@ -1067,10 +1067,10 @@ void NavEKF2_core::writeDefaultAirSpeed(float airspeed)
     defaultAirSpeed = airspeed;
 }
 
-void NavEKF2_core::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
+void NavEKF2_core::writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
     // protect against NaN
-    if (vel.is_nan() || isnan(err)) {
+    if (vel.is_nan() || isnan(err_xy) || isnan(err_z)) {
         return;
     }
 
@@ -1081,7 +1081,8 @@ void NavEKF2_core::writeExtNavVelData(const Vector3f &vel, float err, uint32_t t
     extNavVelMeasTime_ms = timeStamp_ms;
     useExtNavVel = true;
     extNavVelNew.vel = vel.toftype();
-    extNavVelNew.err = err;
+    extNavVelNew.err_xy = err_xy;
+    extNavVelNew.err_z = err_z;
     timeStamp_ms = timeStamp_ms - delay_ms;
     // Correct for the average intersampling delay due to the filter updaterate
     timeStamp_ms -= localFilterTimeStep_ms/2;

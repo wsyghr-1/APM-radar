@@ -66,13 +66,13 @@ const AP_Param::GroupInfo AP_RadarOdom::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_POS_M_NSE", 4, AP_RadarOdom, _pos_noise, 0.2f),
 
-    // @Param: _VEL_M_NSE
-    // @DisplayName: Radar odometry velocity measurement noise
-    // @Description: Radar odometry velocity measurement noise minimum in meters per second. This value is used if the sensor provides a lower noise value or no noise value.
+    // @Param: _VELXY_M_NSE
+    // @DisplayName: Radar odometry horizontal velocity measurement noise
+    // @Description: Radar odometry horizontal velocity measurement noise minimum in meters per second. This value is used for the X and Y axes if the sensor provides a lower noise value or no noise value.
     // @Units: m/s
     // @Range: 0.05 5.0
     // @User: Advanced
-    AP_GROUPINFO("_VEL_M_NSE", 5, AP_RadarOdom, _vel_noise, 0.1f),
+    AP_GROUPINFO("_VELXY_M_NSE", 5, AP_RadarOdom, _vel_noise_xy, 0.1f),
 
     // @Param: _YAW_M_NSE
     // @DisplayName: Radar odometry yaw measurement noise
@@ -89,6 +89,14 @@ const AP_Param::GroupInfo AP_RadarOdom::var_info[] = {
     // @Range: -1 100
     // @User: Advanced
     AP_GROUPINFO("_QUAL_MIN", 7, AP_RadarOdom, _quality_min, 0),
+
+    // @Param: _VELZ_M_NSE
+    // @DisplayName: Radar odometry vertical velocity measurement noise
+    // @Description: Radar odometry vertical velocity measurement noise minimum in meters per second. This value is used for the Z axis if the sensor provides a lower noise value or no noise value.
+    // @Units: m/s
+    // @Range: 0.05 5.0
+    // @User: Advanced
+    AP_GROUPINFO("_VELZ_M_NSE", 8, AP_RadarOdom, _vel_noise_z, 0.1f),
 
     AP_GROUPEND
 };
@@ -139,7 +147,8 @@ void AP_RadarOdom::handle_odometry(uint64_t remote_time_us, uint32_t time_ms, co
     _quality = valid ? 100 : -1;
 
     posErr = constrain_float(posErr, _pos_noise, 100.0f);
-    velErr = constrain_float(velErr, _vel_noise, 100.0f);
+    const float vel_err_xy = constrain_float(velErr, _vel_noise_xy, 100.0f);
+    const float vel_err_z = constrain_float(velErr, _vel_noise_z, 100.0f);
 
     const uint8_t fuse = uint8_t(_fuse.get());
     const bool quality_ok = (_quality >= _quality_min);
@@ -155,7 +164,7 @@ void AP_RadarOdom::handle_odometry(uint64_t remote_time_us, uint32_t time_ms, co
     }
 
     if (valid && quality_ok && ((fuse & FUSE_VELOCITY) != 0)) {
-        AP::ahrs().writeExtNavVelData(vel, velErr, time_ms, get_delay_ms());
+        AP::ahrs().writeExtNavVelData(vel, vel_err_xy, vel_err_z, time_ms, get_delay_ms());
     }
 
     _last_update_ms = AP_HAL::millis();

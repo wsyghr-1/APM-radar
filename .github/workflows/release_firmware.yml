@@ -1,0 +1,161 @@
+name: Release Radar Firmware
+
+on:
+  push:
+    tags:
+      - 'v4.7.0-dev-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.boards.outputs.matrix }}
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor HEAD refs/remotes/origin/release
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Check release helper scripts
+        run: |
+          python3 -m unittest discover -s Tools/scripts/tests -p 'test_radar_release.py' -v
+      - name: Generate board batches
+        id: boards
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          python3 Tools/scripts/radar_release_boards.py \
+            --version "$RELEASE_VERSION" --commit "$SOURCE_COMMIT" \
+            --batches 20 --output release-plan.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: radar-release-plan
+          path: release-plan.json
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    needs: plan
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    container: ardupilot/ardupilot-dev-chibios:v0.1.3
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Build and verify batch ${{ matrix.batch }}
+        shell: bash
+        env:
+          BOARDS_JSON: ${{ toJSON(matrix.boards) }}
+          BATCH: ${{ matrix.batch }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ needs.plan.outputs.commit }}
+        run: |
+          set -euo pipefail
+          export PATH="/opt/gcc-arm-none-eabi-10/bin:/usr/lib/ccache:$PATH"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          arm-none-eabi-gcc --version
+          python3 Tools/scripts/radar_release_build.py build \
+            --boards-json "$BOARDS_JSON" --version "$RELEASE_VERSION" \
+            --commit "$SOURCE_COMMIT" --output "release-results/batch-$BATCH" --clean
+      - name: Upload firmware and diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radar-batch-${{ matrix.batch }}
+          path: release-results/batch-${{ matrix.batch }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: radar-release-plan
+          path: release-input
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: radar-batch-*
+          path: release-input/batches
+      - name: Verify complete results and prepare assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          previous_tag=$(gh release list --exclude-drafts --limit 100 \
+            --json tagName,publishedAt \
+            --jq "sort_by(.publishedAt) | reverse | map(select(.tagName != \"$RELEASE_VERSION\")) | .[0].tagName // empty")
+          python3 Tools/scripts/radar_release_build.py collect \
+            --plan release-input/release-plan.json \
+            --results release-input/batches --output release-assets \
+            --repository "$GH_REPO" --previous-tag "$previous_tag"
+      - name: Preserve release metadata for maintainers
+        uses: actions/upload-artifact@v4
+        with:
+          name: radar-release-metadata
+          path: |
+            release-assets/supported-boards.txt
+            release-assets/skipped-boards.txt
+            release-assets/build-manifest.json
+            release-assets/SHA256SUMS
+            release-assets/RELEASE_NOTES.md
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish versioned release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          firmware_assets=(release-assets/*_ArduCopter.apj release-assets/*_bootloader.bin)
+          if [ "${#firmware_assets[@]}" -eq 0 ]; then
+            echo "No firmware assets to publish."
+            exit 1
+          fi
+          if gh release view "$RELEASE_VERSION" --json isDraft --jq '.isDraft' > release-state.txt; then
+            if [ "$(cat release-state.txt)" != "true" ]; then
+              echo "This version is already published. Use a new version tag."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_VERSION" --verify-tag --draft --prerelease=false \
+              --title "$RELEASE_VERSION" --notes-file release-assets/RELEASE_NOTES.md
+          fi
+          gh release upload "$RELEASE_VERSION" "${firmware_assets[@]}" --clobber
+          gh release edit "$RELEASE_VERSION" --draft=false --prerelease=false \
+            --notes-file release-assets/RELEASE_NOTES.md

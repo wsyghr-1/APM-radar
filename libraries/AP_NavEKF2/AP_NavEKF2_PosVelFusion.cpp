@@ -39,7 +39,8 @@ void NavEKF2_core::ResetVelocity(void)
         } else if (imuSampleTime_ms - extNavVelMeasTime_ms < 250) {
             // use external nav data as the 2nd preference
             stateStruct.velocity = extNavVelDelayed.vel;
-            P[5][5] = P[4][4] = P[3][3] = sq(extNavVelDelayed.err);
+            P[4][4] = P[3][3] = sq(extNavVelDelayed.err_xy);
+            P[5][5] = sq(extNavVelDelayed.err_z);
         } else {
             stateStruct.velocity.x  = 0.0f;
             stateStruct.velocity.y  = 0.0f;
@@ -235,7 +236,7 @@ void NavEKF2_core::ResetHeight(void)
 
     // set the variances to the measurement variance
     if (useExtNavVel) {
-        P[5][5] = sq(extNavVelNew.err);
+        P[5][5] = sq(extNavVelNew.err_z);
     } else {
         P[5][5] = sq(frontend->_gpsVertVelNoise);
     }
@@ -609,7 +610,8 @@ void NavEKF2_core::FuseVelPosNED()
                 R_OBS[0] = sq(constrain_ftype(gpsSpdAccuracy, frontend->_gpsHorizVelNoise, 50.0f));
                 R_OBS[2] = sq(constrain_ftype(gpsSpdAccuracy, frontend->_gpsVertVelNoise, 50.0f));
             } else if (extNavVelToFuse) {
-                R_OBS[2] = R_OBS[0] = sq(constrain_ftype(extNavVelDelayed.err, 0.05f, 5.0f));
+                R_OBS[0] = sq(constrain_ftype(extNavVelDelayed.err_xy, 0.05f, 5.0f));
+                R_OBS[2] = sq(constrain_ftype(extNavVelDelayed.err_z, 0.05f, 5.0f));
             } else {
                 // calculate additional error in GPS velocity caused by manoeuvring
                 R_OBS[0] = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
@@ -628,13 +630,17 @@ void NavEKF2_core::FuseVelPosNED()
             // For data integrity checks we use the same measurement variances as used to calculate the Kalman gains for all measurements except GPS horizontal velocity
             // For horizontal GPS velocity we don't want the acceptance radius to increase with reported GPS accuracy so we use a value based on best GPS perfomrance
             // plus a margin for manoeuvres. It is better to reject GPS horizontal velocity errors early
-            ftype obs_data_chk;
+            ftype obs_data_chk_xy;
+            ftype obs_data_chk_z;
             if (extNavVelToFuse) {
-                obs_data_chk = sq(constrain_ftype(extNavVelDelayed.err, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
+                obs_data_chk_xy = sq(constrain_ftype(extNavVelDelayed.err_xy, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
+                obs_data_chk_z = sq(constrain_ftype(extNavVelDelayed.err_z, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
             } else {
-                obs_data_chk = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
+                obs_data_chk_xy = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
+                obs_data_chk_z = obs_data_chk_xy;
             }
-            R_OBS_DATA_CHECKS[0] = R_OBS_DATA_CHECKS[1] = R_OBS_DATA_CHECKS[2] = obs_data_chk;
+            R_OBS_DATA_CHECKS[0] = R_OBS_DATA_CHECKS[1] = obs_data_chk_xy;
+            R_OBS_DATA_CHECKS[2] = obs_data_chk_z;
         }
         R_OBS[5] = posDownObsNoise;
         for (uint8_t i=3; i<=5; i++) R_OBS_DATA_CHECKS[i] = R_OBS[i];

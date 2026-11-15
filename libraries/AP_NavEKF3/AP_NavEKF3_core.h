@@ -347,11 +347,12 @@ public:
      * Write velocity data from an external navigation system
      *
      * vel : velocity in NED (m)
-     * err : velocity error (m/s)
+     * err_xy : horizontal velocity error (m/s)
+     * err_z : vertical velocity error (m/s)
      * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
      * delay_ms : average delay of external nav system measurements relative to inertial measurements
     */
-    void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
+    void writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     /*
      * Write terrain altitude (derived from SRTM) in meters above the origin
@@ -670,7 +671,8 @@ private:
 
     struct ext_nav_vel_elements : EKF_obs_element_t {
         Vector3F vel;               // velocity in NED (m/s)
-        ftype err;                  // velocity measurement error (m/s)
+        ftype err_xy;               // horizontal velocity measurement error (m/s)
+        ftype err_z;                // vertical velocity measurement error (m/s)
         bool corrected;             // true when the velocity has been corrected for sensor position
     };
 
@@ -1035,7 +1037,7 @@ private:
     // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration
     // Scale factor applied to vertical velocity measurement variance due to manoeuvre acceleration
     // variances argument is updated with variances for each axis
-    void CalculateVelInnovationsAndVariances(const Vector3F &velocity, ftype noise, ftype accel_scale, Vector3F &innovations, Vector3F &variances) const;
+    void CalculateVelInnovationsAndVariances(const Vector3F &velocity, ftype noise_xy, ftype noise_z, ftype accel_scale_xy, ftype accel_scale_z, Vector3F &innovations, Vector3F &variances) const;
 
     // Runs the IMU prediction step for an independent GSF yaw estimator algorithm
     // that uses IMU, GPS horizontal velocity and optionally true airspeed data.

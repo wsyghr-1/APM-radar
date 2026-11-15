@@ -385,11 +385,17 @@ void AP_DAL::log_SetLatLng(const Location &loc, float posAccuracy, uint32_t time
 // log external velocity data
 void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
+    writeExtNavVelData(vel, err, err, timeStamp_ms, delay_ms);
+}
+
+void AP_DAL::writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms)
+{
     end_frame();
 
     const log_REVH old = _REVH;
     _REVH.vel = vel;
-    _REVH.err = err;
+    _REVH.err_xy = err_xy;
+    _REVH.err_z = err_z;
     _REVH.timeStamp_ms = timeStamp_ms;
     _REVH.delay_ms = delay_ms;
     WRITE_REPLAY_BLOCK_IFCHANGED(REVH, _REVH, old);
@@ -506,8 +512,8 @@ void AP_DAL::handle_message(const log_REPH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 void AP_DAL::handle_message(const log_REVH &msg, NavEKF2 &ekf2, NavEKF3 &ekf3)
 {
     _REVH = msg;
-    ekf2.writeExtNavVelData(msg.vel, msg.err, msg.timeStamp_ms, msg.delay_ms);
-    ekf3.writeExtNavVelData(msg.vel, msg.err, msg.timeStamp_ms, msg.delay_ms);
+    ekf2.writeExtNavVelData(msg.vel, msg.err_xy, msg.err_z, msg.timeStamp_ms, msg.delay_ms);
+    ekf3.writeExtNavVelData(msg.vel, msg.err_xy, msg.err_z, msg.timeStamp_ms, msg.delay_ms);
 }
 
 /*

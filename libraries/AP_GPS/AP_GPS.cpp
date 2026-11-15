@@ -935,6 +935,15 @@ void AP_GPS::update_instance(uint8_t instance)
         }
 
         data_should_be_logged = true;
+
+        if (instance == 0) {
+#if AP_GPS_GPS_RAW_INT_SENDING_ENABLED
+            GCS_SEND_MESSAGE(MSG_GPS_RAW);
+#endif
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED
+            GCS_SEND_MESSAGE(MSG_GPS_VELOCITY_NED);
+#endif
+        }
     }
 
 #if GPS_MAX_RECEIVERS > 1
@@ -1409,6 +1418,40 @@ void AP_GPS::send_mavlink_gps_raw(mavlink_channel_t chan)
         gps_yaw_cdeg(0));
 }
 #endif  // AP_GPS_GPS_RAW_INT_SENDING_ENABLED
+
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED
+void AP_GPS::send_mavlink_gps_velocity_ned(mavlink_channel_t chan)
+{
+    constexpr uint8_t instance = 0;
+
+    if (get_type(instance) == GPS_TYPE_NONE) {
+        return;
+    }
+
+    const Vector3f &vel = velocity(instance);
+    const bool valid = status(instance) >= GPS_OK_FIX_3D &&
+                       have_vertical_velocity(instance) &&
+                       !vel.is_nan() &&
+                       !vel.is_inf();
+
+    float speed_accuracy_ms = 0.0f;
+    uint16_t accuracy_cms = UINT16_MAX;
+    if (speed_accuracy(instance, speed_accuracy_ms) &&
+        isfinite(speed_accuracy_ms) &&
+        speed_accuracy_ms >= 0.0f) {
+        accuracy_cms = float_to_uint16(speed_accuracy_ms * 100.0f);
+    }
+
+    mavlink_msg_gps_velocity_ned_send(
+        chan,
+        last_fix_time_ms(instance) * uint64_t(1000),
+        float_to_int16(vel.x * 100.0f),
+        float_to_int16(vel.y * 100.0f),
+        float_to_int16(vel.z * 100.0f),
+        accuracy_cms,
+        uint8_t(valid));
+}
+#endif
 
 #if AP_GPS_GPS2_RAW_SENDING_ENABLED
 void AP_GPS::send_mavlink_gps2_raw(mavlink_channel_t chan)

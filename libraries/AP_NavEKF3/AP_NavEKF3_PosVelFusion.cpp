@@ -61,7 +61,7 @@ void NavEKF3_core::ResetVelocity(resetDataSource velResetSource)
             // already corrected for sensor position
             stateStruct.velocity.x = extNavVelDelayed.vel.x;
             stateStruct.velocity.y = extNavVelDelayed.vel.y;
-            P[5][5] = P[4][4] = sq(extNavVelDelayed.err);
+            P[5][5] = P[4][4] = sq(extNavVelDelayed.err_xy);
 #endif // EK3_FEATURE_EXTERNAL_NAV
         } else {
             stateStruct.velocity.x  = 0.0f;
@@ -353,7 +353,7 @@ void NavEKF3_core::ResetHeight(void)
     // set the variances to the measurement variance
 #if EK3_FEATURE_EXTERNAL_NAV
     if (useExtNavVel) {
-        P[6][6] = sq(extNavVelDelayed.err);
+        P[6][6] = sq(extNavVelDelayed.err_z);
     } else
 #endif
     {
@@ -482,17 +482,18 @@ void NavEKF3_core::CorrectExtNavVelForSensorOffset(ext_nav_vel_elements &ext_nav
 }
 
 // calculate velocity variance helper function
-void NavEKF3_core::CalculateVelInnovationsAndVariances(const Vector3F &velocity, ftype noise, ftype accel_scale, Vector3F &innovations, Vector3F &variances) const
+void NavEKF3_core::CalculateVelInnovationsAndVariances(const Vector3F &velocity, ftype noise_xy, ftype noise_z, ftype accel_scale_xy, ftype accel_scale_z, Vector3F &innovations, Vector3F &variances) const
 {
     // innovations are latest estimate - latest observation
     innovations = stateStruct.velocity - velocity;
 
-    const ftype obs_data_chk = sq(constrain_ftype(noise, 0.05, 5.0)) + sq(accel_scale * accNavMag);
+    const ftype obs_data_chk_xy = sq(constrain_ftype(noise_xy, 0.05, 5.0)) + sq(accel_scale_xy * accNavMag);
+    const ftype obs_data_chk_z = sq(constrain_ftype(noise_z, 0.05, 5.0)) + sq(accel_scale_z * accNavMag);
 
     // calculate innovation variance.  velocity states start at index 4
-    variances.x = P[4][4] + obs_data_chk;
-    variances.y = P[5][5] + obs_data_chk;
-    variances.z = P[6][6] + obs_data_chk;
+    variances.x = P[4][4] + obs_data_chk_xy;
+    variances.y = P[5][5] + obs_data_chk_xy;
+    variances.z = P[6][6] + obs_data_chk_z;
 }
 
 /********************************************************
@@ -522,7 +523,7 @@ void NavEKF3_core::SelectVelPosFusion()
         CorrectExtNavVelForSensorOffset(extNavVelDelayed);
 
         // calculate innovations and variances for reporting purposes only
-        CalculateVelInnovationsAndVariances(extNavVelDelayed.vel, extNavVelDelayed.err, frontend->extNavVelVarAccScale, extNavVelInnov, extNavVelVarInnov);
+        CalculateVelInnovationsAndVariances(extNavVelDelayed.vel, extNavVelDelayed.err_xy, extNavVelDelayed.err_z, frontend->extNavVelVarAccScale, frontend->extNavVelVarAccScale, extNavVelInnov, extNavVelVarInnov);
 
         // record time innovations were calculated (for timeout checks)
         extNavVelInnovTime_ms = dal.millis();
@@ -539,7 +540,7 @@ void NavEKF3_core::SelectVelPosFusion()
     if (gpsDataToFuse) {
         CorrectGPSForAntennaOffset(gpsDataDelayed);
         // calculate innovations and variances for reporting purposes only
-        CalculateVelInnovationsAndVariances(gpsDataDelayed.vel, frontend->_gpsHorizVelNoise.get(), frontend->gpsNEVelVarAccScale, gpsVelInnov, gpsVelVarInnov);
+        CalculateVelInnovationsAndVariances(gpsDataDelayed.vel, frontend->_gpsHorizVelNoise.get(), frontend->_gpsHorizVelNoise.get(), frontend->gpsNEVelVarAccScale, frontend->gpsNEVelVarAccScale, gpsVelInnov, gpsVelVarInnov);
         // record time GPS data was retrieved from the buffer (for timeout checks)
         gpsRetrieveTime_ms = dal.millis();
     }
@@ -727,18 +728,30 @@ void NavEKF3_core::FuseVelPosNED()
             for (uint8_t i=0; i<=2; i++) R_OBS_DATA_CHECKS[i] = R_OBS[i];
         } else {
 #if EK3_FEATURE_EXTERNAL_NAV
-            const bool extNavUsedForVel = extNavVelToFuse && frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index);
-            if (extNavUsedForVel) {
-                R_OBS[2] = R_OBS[0] = sq(constrain_ftype(extNavVelDelayed.err, 0.05f, 50.0f));
-            } else
+            const bool extNavUsedForVelXY = extNavVelToFuse && frontend->sources.useVelXYSource(AP_NavEKF_Source::SourceXY::EXTNAV, core_index);
+            const bool extNavUsedForVelZ = extNavVelToFuse && frontend->sources.useVelZSource(AP_NavEKF_Source::SourceZ::EXTNAV, core_index);
+            const ftype extNavVelErrXY = extNavVelDelayed.err_xy;
+            const ftype extNavVelErrZ = extNavVelDelayed.err_z;
+#else
+            constexpr bool extNavUsedForVelXY = false;
+            constexpr bool extNavUsedForVelZ = false;
+            constexpr ftype extNavVelErrXY = 0.0f;
+            constexpr ftype extNavVelErrZ = 0.0f;
 #endif
-            if (gpsSpdAccuracy > 0.0f) {
+            if (extNavUsedForVelXY) {
+                R_OBS[0] = sq(constrain_ftype(extNavVelErrXY, 0.05f, 50.0f));
+            } else if (gpsSpdAccuracy > 0.0f) {
                 // use GPS receivers reported speed accuracy if available and floor at value set by GPS velocity noise parameter
                 R_OBS[0] = sq(constrain_ftype(gpsSpdAccuracy, frontend->_gpsHorizVelNoise, 50.0f));
-                R_OBS[2] = sq(constrain_ftype(gpsSpdAccuracy, frontend->_gpsVertVelNoise, 50.0f));
             } else {
                 // calculate additional error in GPS velocity caused by manoeuvring
                 R_OBS[0] = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
+            }
+            if (extNavUsedForVelZ) {
+                R_OBS[2] = sq(constrain_ftype(extNavVelErrZ, 0.05f, 50.0f));
+            } else if (gpsSpdAccuracy > 0.0f) {
+                R_OBS[2] = sq(constrain_ftype(gpsSpdAccuracy, frontend->_gpsVertVelNoise, 50.0f));
+            } else {
                 R_OBS[2] = sq(constrain_ftype(frontend->_gpsVertVelNoise,  0.05f, 5.0f)) + sq(frontend->gpsDVelVarAccScale  * accNavMag);
             }
             R_OBS[1] = R_OBS[0];
@@ -759,16 +772,20 @@ void NavEKF3_core::FuseVelPosNED()
             // For data integrity checks we use the same measurement variances as used to calculate the Kalman gains for all measurements except GPS horizontal velocity
             // For horizontal GPS velocity we don't want the acceptance radius to increase with reported GPS accuracy so we use a value based on best GPS performance
             // plus a margin for manoeuvres. It is better to reject GPS horizontal velocity errors early
-            ftype obs_data_chk;
-#if EK3_FEATURE_EXTERNAL_NAV
-            if (extNavUsedForVel) {
-                obs_data_chk = sq(constrain_ftype(extNavVelDelayed.err, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
-            } else
-#endif
-            {
-                obs_data_chk = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
+            ftype obs_data_chk_xy;
+            ftype obs_data_chk_z;
+            if (extNavUsedForVelXY) {
+                obs_data_chk_xy = sq(constrain_ftype(extNavVelErrXY, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
+            } else {
+                obs_data_chk_xy = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
             }
-            R_OBS_DATA_CHECKS[0] = R_OBS_DATA_CHECKS[1] = R_OBS_DATA_CHECKS[2] = obs_data_chk;
+            if (extNavUsedForVelZ) {
+                obs_data_chk_z = sq(constrain_ftype(extNavVelErrZ, 0.05f, 5.0f)) + sq(frontend->extNavVelVarAccScale * accNavMag);
+            } else {
+                obs_data_chk_z = sq(constrain_ftype(frontend->_gpsHorizVelNoise, 0.05f, 5.0f)) + sq(frontend->gpsNEVelVarAccScale * accNavMag);
+            }
+            R_OBS_DATA_CHECKS[0] = R_OBS_DATA_CHECKS[1] = obs_data_chk_xy;
+            R_OBS_DATA_CHECKS[2] = obs_data_chk_z;
         }
         R_OBS[5] = posDownObsNoise;
         for (uint8_t i=3; i<=5; i++) R_OBS_DATA_CHECKS[i] = R_OBS[i];

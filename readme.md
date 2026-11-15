@@ -142,7 +142,8 @@ maxTimeDelay_ms = MAX(maxTimeDelay_ms, MIN(radar_odom->get_delay_ms(), 250));
 | `RADO_POS_Z` | `0.0` | 雷达相对机体原点的 Z 偏移，下为正，单位 m |
 | `RADO_DELAY_MS` | `10` | 雷达测量相对 IMU 的延迟，单位 ms |
 | `RADO_POS_M_NSE` | `0.2` | 位置测量噪声下限，单位 m |
-| `RADO_VEL_M_NSE` | `0.1` | 速度测量噪声下限，单位 m/s |
+| `RADO_VELXY_M_NSE` | `0.1` | 水平速度测量噪声下限，X/Y共用，单位 m/s |
+| `RADO_VELZ_M_NSE` | `0.1` | 垂直速度测量噪声下限，单位 m/s |
 | `RADO_YAW_M_NSE` | `0.2` | yaw 测量噪声下限，单位 rad |
 | `RADO_QUAL_MIN` | `0` | 最低质量阈值，当前有效消息映射为 `100`，无效消息映射为 `-1` |
 
@@ -212,7 +213,8 @@ RADO_FUSE = 3
 RADO_POS_X/Y/Z
 RADO_DELAY_MS
 RADO_POS_M_NSE
-RADO_VEL_M_NSE
+RADO_VELXY_M_NSE
+RADO_VELZ_M_NSE
 RADO_YAW_M_NSE
 ```
 
@@ -221,5 +223,6 @@ RADO_YAW_M_NSE
 - 当前 `RADAR_ODOMETRY` 的质量值只由 `is_valid` 映射，未使用更细粒度的质量评分。
 - `RADO_QUAL_MIN` 默认是 `0`，因此有效消息 `100` 会融合，无效消息 `-1` 会被忽略。
 - `RADAR_ODOMETRY` 四元数顺序按 `w, x, y, z` 构造。
-- 位置和速度标准差使用三轴 RSS 合成为单个误差值，再由 `RADO_POS_M_NSE` 和 `RADO_VEL_M_NSE` 设置下限。
+- 位置和速度标准差仍按原逻辑分别使用三轴 RSS 合成为单个传感器误差值。
+- 飞控侧对同一个雷达速度误差分别应用 `RADO_VELXY_M_NSE` 和 `RADO_VELZ_M_NSE` 下限，得到EKF使用的水平和垂直速度噪声。
 - 雷达启用后，如果 300ms 内没有收到有效处理过的数据，arm 前检查会失败。
