@@ -323,6 +323,7 @@ public:
 
     // Write velocity data from an external navigation system
     void writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms);
+    void writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms);
 
     // Write terrain (derived from SRTM) altitude in meters above sea level
     void writeTerrainAMSL(float alt_amsl_m);

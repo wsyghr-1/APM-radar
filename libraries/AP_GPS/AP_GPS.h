@@ -30,6 +30,10 @@
 #include <SITL/SIM_GPS.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED && !defined(MAVLINK_MSG_ID_GPS_VELOCITY_NED)
+#error "GPS_VELOCITY_NED is enabled but missing from the MAVLink dialect"
+#endif
+
 #define GPS_UNKNOWN_DOP UINT16_MAX // set unknown DOP's to maximum value, which is also correct for MAVLink
 
 // the number of GPS leap seconds - copied into SIM_GPS.cpp
@@ -498,6 +502,9 @@ public:
     //MAVLink Status Sending
     void send_mavlink_gps_raw(mavlink_channel_t chan);
     void send_mavlink_gps2_raw(mavlink_channel_t chan);
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED
+    void send_mavlink_gps_velocity_ned(mavlink_channel_t chan);
+#endif
 
     void send_mavlink_gps_rtk(mavlink_channel_t chan, uint8_t inst);
 

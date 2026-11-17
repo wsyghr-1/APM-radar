@@ -1920,7 +1920,7 @@ void NavEKF3_core::ConstrainVariances()
             // set the variances to the measurement variance
         #if EK3_FEATURE_EXTERNAL_NAV
             if (useExtNavVel) {
-                P[6][6] = sq(extNavVelDelayed.err);
+                P[6][6] = sq(extNavVelDelayed.err_z);
             } else
         #endif
             {

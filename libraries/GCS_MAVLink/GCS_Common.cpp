@@ -1072,6 +1072,9 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
 #if AP_GPS_GPS_RAW_INT_SENDING_ENABLED
         { MAVLINK_MSG_ID_GPS_RAW_INT,           MSG_GPS_RAW},
 #endif
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED
+        { MAVLINK_MSG_ID_GPS_VELOCITY_NED,      MSG_GPS_VELOCITY_NED},
+#endif
 #if AP_GPS_GPS_RTK_SENDING_ENABLED
         { MAVLINK_MSG_ID_GPS_RTK,               MSG_GPS_RTK},
 #endif
@@ -6593,6 +6596,12 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
         AP::gps().send_mavlink_gps_raw(chan);
         break;
 #endif  // AP_GPS_GPS_RAW_INT_SENDING_ENABLED
+#if AP_MAVLINK_MSG_GPS_VELOCITY_NED_ENABLED
+    case MSG_GPS_VELOCITY_NED:
+        CHECK_PAYLOAD_SIZE(GPS_VELOCITY_NED);
+        AP::gps().send_mavlink_gps_velocity_ned(chan);
+        break;
+#endif
 #if AP_GPS_GPS_RTK_SENDING_ENABLED
     case MSG_GPS_RTK:
         CHECK_PAYLOAD_SIZE(GPS_RTK);

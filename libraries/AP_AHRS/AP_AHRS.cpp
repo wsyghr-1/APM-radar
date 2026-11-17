@@ -2512,11 +2512,18 @@ void AP_AHRS::writeDefaultAirSpeed(float airspeed, float uncertainty)
 // Write velocity data from an external navigation system
 void AP_AHRS::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
+    writeExtNavVelData(vel, err, err, timeStamp_ms, delay_ms);
+}
+
+// Write velocity data from an external navigation system with separate
+// horizontal and vertical 1-sigma measurement errors
+void AP_AHRS::writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms)
+{
 #if HAL_NAVEKF2_AVAILABLE
-    EKF2.writeExtNavVelData(vel, err, timeStamp_ms, delay_ms);
+    EKF2.writeExtNavVelData(vel, err_xy, err_z, timeStamp_ms, delay_ms);
 #endif
 #if HAL_NAVEKF3_AVAILABLE
-    EKF3.writeExtNavVelData(vel, err, timeStamp_ms, delay_ms);
+    EKF3.writeExtNavVelData(vel, err_xy, err_z, timeStamp_ms, delay_ms);
 #endif
 }
 

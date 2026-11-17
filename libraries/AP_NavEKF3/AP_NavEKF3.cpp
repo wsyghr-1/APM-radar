@@ -1648,11 +1648,23 @@ void NavEKF3::writeExtNavData(const Vector3f &pos, const Quaternion &quat, float
 */
 void NavEKF3::writeExtNavVelData(const Vector3f &vel, float err, uint32_t timeStamp_ms, uint16_t delay_ms)
 {
-    dal.writeExtNavVelData(vel, err, timeStamp_ms, delay_ms);
+    writeExtNavVelData(vel, err, err, timeStamp_ms, delay_ms);
+}
+
+/* Write velocity data from an external navigation system
+ * vel : velocity in NED (m)
+ * err_xy : horizontal velocity error (m/s)
+ * err_z : vertical velocity error (m/s)
+ * timeStamp_ms : system time the measurement was taken, not the time it was received (mSec)
+ * delay_ms : average delay of external nav system measurements relative to inertial measurements
+*/
+void NavEKF3::writeExtNavVelData(const Vector3f &vel, float err_xy, float err_z, uint32_t timeStamp_ms, uint16_t delay_ms)
+{
+    dal.writeExtNavVelData(vel, err_xy, err_z, timeStamp_ms, delay_ms);
 
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
-            core[i].writeExtNavVelData(vel, err, timeStamp_ms, delay_ms);
+            core[i].writeExtNavVelData(vel, err_xy, err_z, timeStamp_ms, delay_ms);
         }
     }
 }

@@ -526,12 +526,14 @@ struct log_RSLL {
 // @Field: VX: external velocity estimate, X-axis
 // @Field: VY: external velocity estimate, Y-axis
 // @Field: VZ: external velocity estimate, Z-axis
-// @Field: Er: error in velocity estimate
+// @Field: ErXY: horizontal error in velocity estimate
+// @Field: ErZ: vertical error in velocity estimate
 // @Field: TS: timestamp of velocity estimate
 // @Field: D: delay in external velocity data
 struct log_REVH {
     Vector3f vel;
-    float err;
+    float err_xy;
+    float err_z;
     uint32_t timeStamp_ms;
     uint16_t delay_ms;
     uint8_t _end;
@@ -651,7 +653,7 @@ struct log_RTER {
     { LOG_RSLL_MSG, RLOG_SIZE(RSLL),                         \
       "RSLL", "IIfI", "Lat,Lng,PosAccSD,TS", "DU--", "GG--" }, \
     { LOG_REVH_MSG, RLOG_SIZE(REVH),                                   \
-      "REVH", "ffffIH", "VX,VY,VZ,Er,TS,D", "------", "------" }, \
+      "REVH", "fffffIH", "VX,VY,VZ,ErXY,ErZ,TS,D", "-------", "-------" }, \
     { LOG_RWOH_MSG, RLOG_SIZE(RWOH),                                   \
       "RWOH", "ffIffff", "DA,DT,TS,PX,PY,PZ,R", "-------", "-------" }, \
     { LOG_RBOH_MSG, RLOG_SIZE(RBOH),                                   \

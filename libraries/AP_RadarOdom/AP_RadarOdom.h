@@ -60,7 +60,8 @@ private:
     AP_Vector3f _pos_offset;
     AP_Int16 _delay_ms;
     AP_Float _pos_noise;
-    AP_Float _vel_noise;
+    AP_Float _vel_noise_xy;
+    AP_Float _vel_noise_z;
     AP_Float _yaw_noise;
     AP_Int8 _quality_min;
 
