@@ -19,7 +19,7 @@ jobs:
       matrix: ${{ steps.boards.outputs.matrix }}
       commit: ${{ steps.source.outputs.commit }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -42,7 +42,7 @@ jobs:
           python3 Tools/scripts/radar_release_boards.py \
             --version "$RELEASE_VERSION" --commit "$SOURCE_COMMIT" \
             --batches 20 --output release-plan.json --github-output "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: radar-release-plan
           path: release-plan.json
@@ -59,7 +59,7 @@ jobs:
       max-parallel: 20
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.commit }}
           submodules: recursive
@@ -81,7 +81,7 @@ jobs:
             --commit "$SOURCE_COMMIT" --output "release-results/batch-$BATCH" --clean
       - name: Upload firmware and diagnostic logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: radar-batch-${{ matrix.batch }}
           path: release-results/batch-${{ matrix.batch }}/
@@ -94,15 +94,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: radar-release-plan
           path: release-input
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: radar-batch-*
           path: release-input/batches
@@ -122,7 +122,7 @@ jobs:
             --results release-input/batches --output release-assets \
             --repository "$GH_REPO" --previous-tag "$previous_tag"
       - name: Preserve release metadata for maintainers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: radar-release-metadata
           path: |
